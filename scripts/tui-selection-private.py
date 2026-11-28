@@ -19,7 +19,7 @@ import time
 CLIPBOARD = re.compile(rb"\x1b\]52;c;([A-Za-z0-9+/=]+)\x1b\\")
 CAPTURE_ON = b"\x1b[?1002h\x1b[?1006h"
 CAPTURE_OFF = b"\x1b[?1006l\x1b[?1002l"
-SETTINGS_TITLE = "┌ Settings ".encode()
+SETTINGS_HINT = b"R Reload  Tab Help"
 
 
 def exercise(launcher, root, env, api, mouse_actions):
@@ -52,6 +52,14 @@ def exercise(launcher, root, env, api, mouse_actions):
     def send(data):
         os.write(master, data)
 
+    def open_settings(description):
+        start = len(output)
+        send(b"\x1bOP")  # F1 opens Help.
+        wait_for(lambda: b"Tab Settings" in output[start:], "open Help")
+        start = len(output)
+        send(b"\t")
+        wait_for(lambda: SETTINGS_HINT in output[start:], description)
+
     def clipboard():
         return [base64.b64decode(match) for match in CLIPBOARD.findall(output)]
 
@@ -79,8 +87,7 @@ def exercise(launcher, root, env, api, mouse_actions):
         wait_for(lambda: b"LEFT_PANE_ONLY" in output and b"RIGHT_PANE_ONLY" in output, "both pane markers")
 
         settings.write_text("[sidebar]\nwidth = 20\n[selection]\nmouse = true\n")
-        send(b"\x1bOP")
-        wait_for(lambda: SETTINGS_TITLE in output, "open Settings")
+        open_settings("open Settings")
         send(b"r")
         wait_for(lambda: CAPTURE_ON in output, "enable mouse capture on reload")
         send(b"\x1b")
@@ -133,9 +140,7 @@ def exercise(launcher, root, env, api, mouse_actions):
         api("block.event", session_id=sid, block_id=left,
             event={"type": "key", "payload": {"key": "enter", "action": "press", "mods": ""}})
 
-        send(b"\x1bOP")
-        start = len(output)
-        wait_for(lambda: SETTINGS_TITLE in output[start:], "reopen Settings")
+        open_settings("reopen Settings")
         copy_count = len(clipboard())
         send(b"\x1b[24~")
         pump()
@@ -238,9 +243,7 @@ def exercise(launcher, root, env, api, mouse_actions):
             send(b"x")
             wait_for(lambda: b"LIVETAIL" in output[start:], "typing returns to the live tail")
 
-            start = len(output)
-            send(b"\x1bOP")
-            wait_for(lambda: SETTINGS_TITLE in output[start:], "reopen Settings after mouse actions")
+            open_settings("reopen Settings after mouse actions")
         settings.write_text("[sidebar]\nwidth = 20\n")
         send(b"r")
         wait_for(lambda: CAPTURE_OFF in output, "disable mouse capture on reload")
